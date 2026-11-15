@@ -7,12 +7,26 @@ from typing import Any, Callable, Dict, Optional
 
 
 class TaskManager:
-    def __init__(self, max_concurrent: int = 10):
+    def __init__(self, max_concurrent: int = 10, max_tasks: int = 1000):
         self.max_concurrent = max_concurrent
+        self.max_tasks = max_tasks
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._semaphore = asyncio.Semaphore(max_concurrent)
 
+    def _cleanup_completed(self) -> None:
+        """Remove completed/cancelled/errored tasks to prevent memory leaks."""
+        done_statuses = {"completed", "error", "timeout", "cancelled"}
+        to_remove = [
+            tid for tid, info in self._tasks.items()
+            if info.get("status") in done_statuses
+        ]
+        for tid in to_remove:
+            del self._tasks[tid]
+
     async def submit(self, coro_func: Callable, *args, timeout: Optional[float] = None, **kwargs) -> str:
+        self._cleanup_completed()
+        if len(self._tasks) >= self.max_tasks:
+            raise RuntimeError(f"Task limit reached: {self.max_tasks}")
         task_id = str(uuid.uuid4())
         self._tasks[task_id] = {"status": "pending", "result": None, "error": None}
 
@@ -55,8 +69,12 @@ class TaskManager:
             task.cancel()
 
     async def shutdown(self) -> None:
-        for tid, info in self._tasks.items():
+        tasks_to_await = []
+        for tid, info in list(self._tasks.items()):
             task = info.get("task")
             if task and not task.done():
                 task.cancel()
-        await asyncio.sleep(0)
+                tasks_to_await.append(task)
+        if tasks_to_await:
+            await asyncio.gather(*tasks_to_await, return_exceptions=True)
+        self._tasks.clear()

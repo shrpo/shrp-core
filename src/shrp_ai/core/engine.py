@@ -33,6 +33,8 @@ class CoreEngine:
     async def shutdown(self) -> None:
         await self.modules.shutdown_all()
         await self.tasks.shutdown()
+        if hasattr(self.memory, "close"):
+            self.memory.close()
         self._initialized = False
 
     async def handle_request(self, req: Request) -> Response:

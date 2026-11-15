@@ -44,12 +44,12 @@ class MemoryManager:
         if db_path is None:
             db_path = Path.cwd() / "shrp_core.db"
         self.db_path = Path(db_path)
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
         self._init_db()
 
     def _init_db(self):
-        import sqlite3
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
+        cur = self._conn.cursor()
         cur.execute(
             """CREATE TABLE IF NOT EXISTS records (
                 key TEXT PRIMARY KEY,
@@ -58,48 +58,38 @@ class MemoryManager:
                 updated_at REAL
             )"""
         )
-        conn.commit()
-        conn.close()
+        self._conn.commit()
 
     def save(self, key: str, value: Any) -> None:
-        import sqlite3
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
+        cur = self._conn.cursor()
         now = time.time()
         cur.execute(
             "INSERT OR REPLACE INTO records (key, value, created_at, updated_at) VALUES (?, ?, COALESCE((SELECT created_at FROM records WHERE key=?), ?), ?)",
             (key, json.dumps(value), key, now, now),
         )
-        conn.commit()
-        conn.close()
+        self._conn.commit()
 
     def get(self, key: str) -> Optional[Any]:
-        import sqlite3
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
+        cur = self._conn.cursor()
         cur.execute("SELECT value FROM records WHERE key=?", (key,))
         row = cur.fetchone()
-        conn.close()
         if row is None:
             return None
         return json.loads(row[0])
 
     def delete(self, key: str) -> None:
-        import sqlite3
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
+        cur = self._conn.cursor()
         cur.execute("DELETE FROM records WHERE key=?", (key,))
-        conn.commit()
-        conn.close()
+        self._conn.commit()
 
     def list(self) -> Dict[str, Any]:
-        import sqlite3
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
+        cur = self._conn.cursor()
         cur.execute("SELECT key, value FROM records")
         rows = cur.fetchall()
-        conn.close()
         result = {}
-        for k, v in rows:
-            result[k] = json.loads(v)
+        for row in rows:
+            result[row["key"]] = json.loads(row["value"])
         return result
+
+    def close(self) -> None:
+        self._conn.close()
