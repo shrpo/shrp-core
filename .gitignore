@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing and coverage
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment and secrets
+.env
+.env.*
+*.env
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# OS temporary files
+Thumbs.db
+.DS_Store
